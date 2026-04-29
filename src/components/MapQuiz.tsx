@@ -196,7 +196,6 @@ const MapQuiz = () => {
         const features = geojson.features as CountryFeature[];
 
         // Filter to reach exactly 195 sovereign countries (UN 193 + 2)
-        // We might need to adjust the exclusion list dynamically
         const filtered = features.filter((c) => {
           const name = c.properties.name;
           return name && !EXCLUDED_TERRITORIES.has(name);
@@ -283,7 +282,9 @@ const MapQuiz = () => {
         next.add(matchedCountry.id!);
         // Also light up linked territories (e.g. Greenland when Denmark is typed)
         const linked = territoriesOf[matchedCountry.properties.name] ?? [];
-        linked.forEach((t) => { if (t.id !== undefined) next.add(t.id); });
+        linked.forEach((t) => {
+          if (t.id !== undefined) next.add(t.id);
+        });
         if (newScore === sovereignCountries.length) {
           setGameState("gameover");
         }
@@ -462,7 +463,9 @@ const MapQuiz = () => {
                   />
                   <span className="text-2xl md:text-3xl font-black">
                     {score}
-                    <span className="text-sm md:text-lg ml-1">/ {sovereignCountries.length}</span>
+                    <span className="text-sm md:text-lg ml-1">
+                      / {sovereignCountries.length}
+                    </span>
                   </span>
                 </div>
                 <span className="text-[8px] md:text-[9px] uppercase font-black tracking-widest mt-1">
@@ -507,7 +510,11 @@ const MapQuiz = () => {
                   onClick={() => setIsGlobe(!isGlobe)}
                   className="p-3 md:p-4 rounded-xl md:rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 transition-all shadow-lg"
                 >
-                  {isGlobe ? <MapIcon size={18} className="md:w-[20px] md:h-[20px]" /> : <GlobeIcon size={18} className="md:w-[20px] md:h-[20px]" />}
+                  {isGlobe ? (
+                    <MapIcon size={18} className="md:w-[20px] md:h-[20px]" />
+                  ) : (
+                    <GlobeIcon size={18} className="md:w-[20px] md:h-[20px]" />
+                  )}
                 </button>
                 <button
                   onClick={startGame}
@@ -529,7 +536,10 @@ const MapQuiz = () => {
         {feedback && (
           <div className="mb-3 flex justify-center pointer-events-none">
             <div className="px-6 md:px-8 py-3 md:py-4 rounded-2xl border bg-black/50 border-green-500/30 backdrop-blur-3xl shadow-2xl flex items-center gap-3 md:gap-4 animate-in slide-in-from-bottom-4 duration-300">
-              <CheckCircle2 size={20} className="text-green-500 md:w-[22px] md:h-[22px]" />
+              <CheckCircle2
+                size={20}
+                className="text-green-500 md:w-[22px] md:h-[22px]"
+              />
               <span className="font-black text-base md:text-lg text-green-400 tracking-tight">
                 {feedback.message}
               </span>
@@ -539,9 +549,7 @@ const MapQuiz = () => {
         <div className="bg-zinc-900/70 backdrop-blur-3xl border border-white/10 rounded-[1.5rem] md:rounded-[2rem] p-4 md:p-6 shadow-2xl flex flex-col items-center gap-4 pointer-events-auto transition-all duration-500">
           {gameState === "playing" ? (
             <div className="relative group w-full animate-in slide-in-from-bottom-2 duration-300">
-              <Search
-                className="absolute left-4 md:left-6 top-1/2 -translate-y-1/2 group-focus-within:text-blue-500 w-[20px] md:w-[24px]"
-              />
+              <Search className="absolute left-4 md:left-6 top-1/2 -translate-y-1/2 group-focus-within:text-blue-500 w-[20px] md:w-[24px]" />
               <input
                 ref={inputRef}
                 type="text"
@@ -562,7 +570,8 @@ const MapQuiz = () => {
                 <div className="absolute inset-0 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
               </button>
               <p className="text-[10px] md:text-xs font-bold uppercase tracking-widest text-center">
-                Identify all {sovereignCountries.length} countries to complete the mission.
+                Identify all {sovereignCountries.length} countries to complete
+                the mission.
               </p>
             </div>
           ) : (
@@ -573,7 +582,9 @@ const MapQuiz = () => {
               <div className="flex items-center justify-center gap-4 md:gap-6 mb-4">
                 <div className="text-[10px] md:text-xs text-zinc-400 font-bold uppercase tracking-widest">
                   Countries Found:{" "}
-                  <span className="text-white text-xl md:text-2xl ml-2">{score}</span>
+                  <span className="text-white text-xl md:text-2xl ml-2">
+                    {score}
+                  </span>
                 </div>
               </div>
               <button
@@ -586,8 +597,6 @@ const MapQuiz = () => {
           )}
         </div>
       </div>
-
-
 
       <svg
         ref={svgRef}
