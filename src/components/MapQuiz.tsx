@@ -142,6 +142,8 @@ const TERRITORY_PARENTS: Record<string, string> = {
 const MapQuiz = () => {
   const svgRef = useRef<SVGSVGElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const hideTooltipTimeout = useRef<NodeJS.Timeout | null>(null);
+
   const [countries, setCountries] = useState<CountryFeature[]>([]);
   const [inputValue, setInputValue] = useState("");
   const [score, setScore] = useState(0);
@@ -160,6 +162,8 @@ const MapQuiz = () => {
     null,
   );
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+  const [hintsLeft, setHintsLeft] = useState(15);
+  const [activeHints, setActiveHints] = useState<Record<string, string>>({});
 
   const transformRef = useRef<d3.ZoomTransform>(d3.zoomIdentity);
 
@@ -218,6 +222,8 @@ const MapQuiz = () => {
     setGameState("playing");
     setTimeLeft(initialTime);
     setInputValue("");
+    setHintsLeft(15);
+    setActiveHints({});
     setTimeout(() => inputRef.current?.focus(), 100);
   };
 
@@ -247,6 +253,27 @@ const MapQuiz = () => {
 
     return () => clearInterval(timer);
   }, [gameState]);
+
+  const scrambleName = (name: string) => {
+    return name
+      .split(" ")
+      .map((word) => {
+        if (word.length <= 1) return word;
+        let scrambled = word;
+        let attempts = 0;
+        while (scrambled === word && attempts < 5) {
+          const chars = word.split("");
+          for (let i = chars.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [chars[i], chars[j]] = [chars[j], chars[i]];
+          }
+          scrambled = chars.join("");
+          attempts++;
+        }
+        return scrambled;
+      })
+      .join(" ");
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
@@ -376,19 +403,23 @@ const MapQuiz = () => {
       .attr("stroke-width", 0.3)
       .style("transition", "fill 0.4s ease, opacity 0.2s ease")
       .on("mouseover", function (event, d) {
+        if (hideTooltipTimeout.current) clearTimeout(hideTooltipTimeout.current);
         setHoveredCountry(d);
-        // d3.select(this)
-        //   .attr("opacity", 0.8)
-        //   .attr("stroke", "rgba(255,255,255,0.5)");
-      })
-      .on("mousemove", (event) => {
         setMousePos({ x: event.clientX, y: event.clientY });
       })
+      .on("mousemove", (event) => {
+        setMousePos((prev) => {
+          const dist = Math.hypot(prev.x - event.clientX, prev.y - event.clientY);
+          // Only update tooltip position if mouse moved far enough
+          // This allows the user to catch the tooltip to click the hint button
+          if (dist > 40) return { x: event.clientX, y: event.clientY };
+          return prev;
+        });
+      })
       .on("mouseout", function () {
-        setHoveredCountry(null);
-        // d3.select(this)
-        //   .attr("opacity", 1)
-        //   .attr("stroke", "rgba(255,255,255,0.5)");
+        hideTooltipTimeout.current = setTimeout(() => {
+          setHoveredCountry(null);
+        }, 150);
       });
 
     if (!isGlobe) {
@@ -611,16 +642,48 @@ const MapQuiz = () => {
         gameState === "playing" &&
         !correctIds.has(hoveredCountry.id!) && (
           <div
-            className="fixed z-[100] px-4 py-2 bg-sky-900/40 backdrop-blur-md border border-sky-400/30 rounded-lg text-xs font-bold uppercase tracking-widest pointer-events-none animate-in fade-in zoom-in duration-200 shadow-[0_0_20px_rgba(56,189,248,0.2)]"
+            onMouseEnter={() => {
+              if (hideTooltipTimeout.current) clearTimeout(hideTooltipTimeout.current);
+            }}
+            onMouseLeave={() => {
+              hideTooltipTimeout.current = setTimeout(() => {
+                setHoveredCountry(null);
+              }, 150);
+            }}
+            className="fixed z-[100] px-4 py-3 bg-sky-900/80 backdrop-blur-md border border-sky-400/30 rounded-xl text-xs font-bold uppercase tracking-widest pointer-events-auto animate-in fade-in zoom-in duration-200 shadow-[0_0_20px_rgba(56,189,248,0.3)]"
             style={{ left: mousePos.x + 15, top: mousePos.y + 15 }}
           >
-            <div className="flex flex-col gap-1">
-              <span className="text-sky-300 text-[10px] font-black tracking-[0.2em] mb-1">
-                Satellite Hint
-              </span>
-              <span className="text-white mt-1">
-                {hoveredCountry.properties.name.length} Characters
-              </span>
+            <div className="flex flex-col gap-2">
+              <div className="flex justify-between items-center gap-4">
+                <span className="text-sky-300 text-[10px] font-black tracking-[0.2em]">
+                  Satellite Hint
+                </span>
+                <span className="text-[9px] text-white/50 bg-black/30 px-1.5 py-0.5 rounded">
+                  {hoveredCountry.properties.name.length} Chars
+                </span>
+              </div>
+              
+              {activeHints[hoveredCountry.id!] ? (
+                <div className="text-yellow-300 text-sm tracking-widest text-center py-1">
+                  {activeHints[hoveredCountry.id!]}
+                </div>
+              ) : (
+                hintsLeft > 0 && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setHintsLeft((prev) => prev - 1);
+                      setActiveHints((prev) => ({
+                        ...prev,
+                        [hoveredCountry.id!]: scrambleName(hoveredCountry.properties.name)
+                      }));
+                    }}
+                    className="mt-1 px-3 py-2 bg-sky-500/20 hover:bg-sky-500/40 text-sky-100 rounded-lg text-[10px] transition-colors border border-sky-500/30 active:scale-95"
+                  >
+                    Use Hint ({hintsLeft} left)
+                  </button>
+                )
+              )}
             </div>
           </div>
         )}
