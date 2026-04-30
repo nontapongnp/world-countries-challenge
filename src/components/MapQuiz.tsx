@@ -499,7 +499,17 @@ const MapQuiz = () => {
 
       <svg
         ref={svgRef}
-        className={`w-full h-full cursor-grab active:cursor-grabbing touch-none transition-all duration-1000 ${gameState !== "playing" ? "blur-md scale-110 opacity-30" : ""}`}
+        className={`w-full h-full cursor-grab active:cursor-grabbing touch-none transition-all duration-1000 ${
+          gameState !== "playing" || isPaused ? "scale-110" : ""
+        }`}
+      />
+
+      <div
+        className={`absolute inset-0 bg-black/60 backdrop-blur-md transition-opacity duration-1000 z-0 ${
+          gameState !== "playing" || isPaused
+            ? "opacity-100 pointer-events-auto"
+            : "opacity-0 pointer-events-none"
+        }`}
       />
 
       <div className="hidden md:block absolute bottom-8 right-8 text-[10px] font-black uppercase tracking-[0.3em] bg-black/60 backdrop-blur-xl px-6 py-3 rounded-full border border-white/5 shadow-2xl pointer-events-none">
