@@ -49,10 +49,12 @@ Follow these steps to run the project locally:
 
 ## 🎮 How to Play
 
-1. Click the **"Start 20-Min Challenge"** button.
+1. Click the **"Start Challenge"** button.
 2. A text input will appear. Start typing the names of countries.
 3. If you type a valid country name (or alias), your score will increase, and the country will be highlighted in green on the map.
 4. Try to find all **195** countries before the timer runs out!
+5. You can pause the game by clicking the pause button in the header.
+6. You can adjust the timer by clicking the plus or minus button in the header.
 
 ## 🤝 Contributing
 

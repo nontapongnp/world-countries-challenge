@@ -3,25 +3,10 @@
 import React, { useEffect, useRef, useState, useMemo } from "react";
 import * as d3 from "d3";
 import * as topojson from "topojson-client";
-import {
-  Trophy,
-  RotateCcw,
-  Globe as GlobeIcon,
-  Map as MapIcon,
-  Timer,
-  Search,
-  CheckCircle2,
-  Plus,
-  Minus,
-} from "lucide-react";
-import { Feature, Geometry } from "geojson";
-
-interface CountryProperties {
-  name: string;
-  continent?: string;
-}
-
-type CountryFeature = Feature<Geometry, CountryProperties>;
+import { CountryFeature } from "./quiz/types";
+import { GameHeader } from "./quiz/GameHeader";
+import { GameBottomCard } from "./quiz/GameBottomCard";
+import { MapTooltip } from "./quiz/MapTooltip";
 
 const COUNTRY_ALIASES: Record<string, string[]> = {
   "United States of America": ["usa", "united states", "america", "us"],
@@ -158,6 +143,7 @@ const MapQuiz = () => {
   const [gameState, setGameState] = useState<"idle" | "playing" | "gameover">(
     "idle",
   );
+  const [isPaused, setIsPaused] = useState(false);
   const [hoveredCountry, setHoveredCountry] = useState<CountryFeature | null>(
     null,
   );
@@ -224,6 +210,7 @@ const MapQuiz = () => {
     setInputValue("");
     setHintsLeft(15);
     setActiveHints({});
+    setIsPaused(false);
     setTimeout(() => inputRef.current?.focus(), 100);
   };
 
@@ -239,7 +226,7 @@ const MapQuiz = () => {
   };
 
   useEffect(() => {
-    if (gameState !== "playing") return;
+    if (gameState !== "playing" || isPaused) return;
 
     const timer = setInterval(() => {
       setTimeLeft((prev) => {
@@ -252,7 +239,13 @@ const MapQuiz = () => {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [gameState]);
+  }, [gameState, isPaused]);
+
+  useEffect(() => {
+    if (!isPaused && gameState === "playing") {
+      setTimeout(() => inputRef.current?.focus(), 100);
+    }
+  }, [isPaused, gameState]);
 
   const scrambleName = (name: string) => {
     return name
@@ -279,7 +272,7 @@ const MapQuiz = () => {
     const val = e.target.value;
     setInputValue(val);
 
-    if (gameState !== "playing") return;
+    if (gameState !== "playing" || isPaused) return;
 
     const normalizedInput = val.trim().toLowerCase();
     if (normalizedInput.length < 2) return;
@@ -332,6 +325,9 @@ const MapQuiz = () => {
     const svg = d3.select<SVGSVGElement, unknown>(svgRef.current);
     const width = svgRef.current.clientWidth;
     const height = svgRef.current.clientHeight;
+
+    svg.on(".zoom", null);
+    svg.on(".drag", null);
 
     svg.selectAll("*").remove();
 
@@ -403,13 +399,17 @@ const MapQuiz = () => {
       .attr("stroke-width", 0.3)
       .style("transition", "fill 0.4s ease, opacity 0.2s ease")
       .on("mouseover", function (event, d) {
-        if (hideTooltipTimeout.current) clearTimeout(hideTooltipTimeout.current);
+        if (hideTooltipTimeout.current)
+          clearTimeout(hideTooltipTimeout.current);
         setHoveredCountry(d);
         setMousePos({ x: event.clientX, y: event.clientY });
       })
       .on("mousemove", (event) => {
         setMousePos((prev) => {
-          const dist = Math.hypot(prev.x - event.clientX, prev.y - event.clientY);
+          const dist = Math.hypot(
+            prev.x - event.clientX,
+            prev.y - event.clientY,
+          );
           // Only update tooltip position if mouse moved far enough
           // This allows the user to catch the tooltip to click the hint button
           if (dist > 40) return { x: event.clientX, y: event.clientY };
@@ -469,165 +469,33 @@ const MapQuiz = () => {
         {/* Stars removed for light background visibility */}
       </div>
 
-      <div className="absolute top-4 md:top-6 left-1/2 -translate-x-1/2 z-10 w-full max-w-5xl px-4 md:px-6 pointer-events-none">
-        <div className="bg-zinc-900/70 backdrop-blur-3xl border border-white/10 rounded-[2rem] md:rounded-[2.5rem] p-4 md:p-6 shadow-2xl flex flex-col items-center gap-4 md:gap-6 pointer-events-auto transition-all duration-500">
-          <div className="flex flex-col md:flex-row items-center justify-between w-full px-2 md:px-6 gap-4 md:gap-0">
-            <div className="flex flex-col items-center md:items-start text-center md:text-left">
-              <div className="flex items-center gap-2 mb-1 justify-center md:justify-start">
-                <span
-                  className={`w-2 h-2 rounded-full ${gameState === "playing" ? "bg-green-500 animate-pulse" : "bg-zinc-600"}`}
-                />
-                <span className="text-[9px] md:text-[10px] uppercase tracking-[0.2em] font-black">
-                  Global Knowledge Mission
-                </span>
-              </div>
-              <h2 className="text-xl md:text-2xl font-black bg-gradient-to-br from-white via-zinc-200 to-zinc-600 bg-clip-text text-transparent tracking-tight">
-                World Country Quiz
-              </h2>
-            </div>
-            <div className="flex flex-wrap md:flex-nowrap gap-4 md:gap-8 items-center justify-center w-full md:w-auto">
-              <div className="flex flex-col items-center border-r border-white/10 pr-4 md:pr-8">
-                <div className="flex items-center gap-2 text-blue-400">
-                  <Trophy
-                    size={16}
-                    className="drop-shadow-[0_0_8px_rgba(96,165,250,0.5)] md:w-[18px] md:h-[18px]"
-                  />
-                  <span className="text-2xl md:text-3xl font-black">
-                    {score}
-                    <span className="text-sm md:text-lg ml-1">
-                      / {sovereignCountries.length}
-                    </span>
-                  </span>
-                </div>
-                <span className="text-[8px] md:text-[9px] uppercase font-black tracking-widest mt-1">
-                  Countries Found
-                </span>
-              </div>
-              <div className="flex flex-col items-center">
-                <div
-                  className={`flex items-center gap-2 ${timeLeft < 60 ? "text-red-500 animate-bounce" : "text-white"}`}
-                >
-                  <Timer size={18} className="md:w-[20px] md:h-[20px]" />
-                  <span className="text-2xl md:text-3xl font-black">
-                    {formatTime(
-                      gameState === "playing" ? timeLeft : initialTime,
-                    )}
-                  </span>
-                </div>
-                <div className="flex items-center gap-1 mt-2">
-                  <button
-                    onClick={() => adjustTime(-1)}
-                    disabled={initialTime <= 60}
-                    className="flex items-center justify-center w-7 h-7 rounded-lg bg-white/5 hover:bg-white/15 border border-white/10 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-                    title="-1 minute"
-                  >
-                    <Minus size={13} />
-                  </button>
-                  {/* <span className="text-[9px] uppercase font-black tracking-widest px-1">
-                    {Math.floor(initialTime / 60)}m
-                  </span> */}
-                  <button
-                    onClick={() => adjustTime(1)}
-                    disabled={initialTime >= 3600}
-                    className="flex items-center justify-center w-7 h-7 rounded-lg bg-white/5 hover:bg-white/15 border border-white/10 transition-all disabled:opacity-30 disabled:cursor-not-allowed"
-                    title="+1 minute"
-                  >
-                    <Plus size={13} />
-                  </button>
-                </div>
-              </div>
-              <div className="flex gap-2 w-full md:w-auto justify-center mt-2 md:mt-0">
-                <button
-                  onClick={() => setIsGlobe(!isGlobe)}
-                  className="p-3 md:p-4 rounded-xl md:rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 transition-all shadow-lg"
-                >
-                  {isGlobe ? (
-                    <MapIcon size={18} className="md:w-[20px] md:h-[20px]" />
-                  ) : (
-                    <GlobeIcon size={18} className="md:w-[20px] md:h-[20px]" />
-                  )}
-                </button>
-                <button
-                  onClick={startGame}
-                  className="p-3 md:p-4 rounded-xl md:rounded-2xl bg-white/5 hover:bg-white/10 border border-white/10 transition-all group shadow-lg"
-                >
-                  <RotateCcw
-                    size={18}
-                    className="text-zinc-400 group-hover:rotate-180 transition-transform duration-700 md:w-[20px] md:h-[20px]"
-                  />
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+      <GameHeader
+        gameState={gameState}
+        score={score}
+        totalCountries={sovereignCountries.length}
+        timeLeft={timeLeft}
+        initialTime={initialTime}
+        adjustTime={adjustTime}
+        isGlobe={isGlobe}
+        setIsGlobe={setIsGlobe}
+        startGame={startGame}
+        formatTime={formatTime}
+        isPaused={isPaused}
+        setIsPaused={setIsPaused}
+      />
 
       {/* Bottom card: start / input / gameover */}
-      <div className="absolute bottom-4 md:bottom-6 left-1/2 -translate-x-1/2 z-10 w-full max-w-2xl px-4 md:px-6 pointer-events-none">
-        {feedback && (
-          <div className="mb-3 flex justify-center pointer-events-none">
-            <div className="px-6 md:px-8 py-3 md:py-4 rounded-2xl border bg-black/50 border-green-500/30 backdrop-blur-3xl shadow-2xl flex items-center gap-3 md:gap-4 animate-in slide-in-from-bottom-4 duration-300">
-              <CheckCircle2
-                size={20}
-                className="text-green-500 md:w-[22px] md:h-[22px]"
-              />
-              <span className="font-black text-base md:text-lg text-green-400 tracking-tight">
-                {feedback.message}
-              </span>
-            </div>
-          </div>
-        )}
-        <div className="bg-zinc-900/70 backdrop-blur-3xl border border-white/10 rounded-[1.5rem] md:rounded-[2rem] p-4 md:p-6 shadow-2xl flex flex-col items-center gap-4 pointer-events-auto transition-all duration-500">
-          {gameState === "playing" ? (
-            <div className="relative group w-full animate-in slide-in-from-bottom-2 duration-300">
-              <Search className="absolute left-4 md:left-6 top-1/2 -translate-y-1/2 group-focus-within:text-blue-500 w-[20px] md:w-[24px]" />
-              <input
-                ref={inputRef}
-                type="text"
-                value={inputValue}
-                onChange={handleInputChange}
-                placeholder="Type a country name..."
-                className="w-full bg-black/40 border-2 border-white/10 rounded-xl md:rounded-2xl py-4 md:py-5 pl-12 md:pl-16 pr-4 md:pr-6 text-xl md:text-2xl font-bold placeholder:text-zinc-700 focus:outline-none focus:border-blue-500/50 focus:bg-black/60 transition-all shadow-inner"
-                autoComplete="off"
-              />
-            </div>
-          ) : gameState === "idle" ? (
-            <div className="flex flex-col items-center gap-3">
-              <button
-                onClick={startGame}
-                className="group relative px-10 py-4 md:px-16 md:py-5 bg-white text-black font-black uppercase tracking-widest rounded-xl md:rounded-2xl transition-all hover:scale-105 active:scale-95 overflow-hidden shadow-[0_20px_50px_rgba(255,255,255,0.1)] text-sm md:text-base w-full md:w-auto"
-              >
-                <span className="relative z-10">Start Challenge</span>
-                <div className="absolute inset-0 translate-y-full group-hover:translate-y-0 transition-transform duration-300" />
-              </button>
-              <p className="text-[10px] md:text-xs font-bold uppercase tracking-widest text-center">
-                Identify all {sovereignCountries.length} countries to complete
-                the mission.
-              </p>
-            </div>
-          ) : (
-            <div className="text-center animate-in zoom-in-95 duration-500">
-              <h3 className="text-3xl md:text-4xl font-black text-red-500 mb-2 uppercase tracking-tighter">
-                Mission Terminated
-              </h3>
-              <div className="flex items-center justify-center gap-4 md:gap-6 mb-4">
-                <div className="text-[10px] md:text-xs text-zinc-400 font-bold uppercase tracking-widest">
-                  Countries Found:{" "}
-                  <span className="text-white text-xl md:text-2xl ml-2">
-                    {score}
-                  </span>
-                </div>
-              </div>
-              <button
-                onClick={startGame}
-                className="px-8 py-3 md:px-10 md:py-3 bg-zinc-800 hover:bg-zinc-700 rounded-xl text-xs md:text-sm font-black uppercase tracking-widest transition-all w-full md:w-auto"
-              >
-                Re-attempt Mission
-              </button>
-            </div>
-          )}
-        </div>
-      </div>
+      <GameBottomCard
+        gameState={gameState}
+        score={score}
+        totalCountries={sovereignCountries.length}
+        feedback={feedback}
+        inputValue={inputValue}
+        handleInputChange={handleInputChange}
+        inputRef={inputRef}
+        startGame={startGame}
+        isPaused={isPaused}
+      />
 
       <svg
         ref={svgRef}
@@ -638,55 +506,19 @@ const MapQuiz = () => {
         {isGlobe ? "Drag Globe to Rotate" : "Scroll to Zoom • Drag to Explore"}
       </div>
 
-      {hoveredCountry &&
-        gameState === "playing" &&
-        !correctIds.has(hoveredCountry.id!) && (
-          <div
-            onMouseEnter={() => {
-              if (hideTooltipTimeout.current) clearTimeout(hideTooltipTimeout.current);
-            }}
-            onMouseLeave={() => {
-              hideTooltipTimeout.current = setTimeout(() => {
-                setHoveredCountry(null);
-              }, 150);
-            }}
-            className="fixed z-[100] px-4 py-3 bg-sky-900/80 backdrop-blur-md border border-sky-400/30 rounded-xl text-xs font-bold uppercase tracking-widest pointer-events-auto animate-in fade-in zoom-in duration-200 shadow-[0_0_20px_rgba(56,189,248,0.3)]"
-            style={{ left: mousePos.x + 15, top: mousePos.y + 15 }}
-          >
-            <div className="flex flex-col gap-2">
-              <div className="flex justify-between items-center gap-4">
-                <span className="text-sky-300 text-[10px] font-black tracking-[0.2em]">
-                  Satellite Hint
-                </span>
-                <span className="text-[9px] text-white/50 bg-black/30 px-1.5 py-0.5 rounded">
-                  {hoveredCountry.properties.name.length} Chars
-                </span>
-              </div>
-              
-              {activeHints[hoveredCountry.id!] ? (
-                <div className="text-yellow-300 text-sm tracking-widest text-center py-1">
-                  {activeHints[hoveredCountry.id!]}
-                </div>
-              ) : (
-                hintsLeft > 0 && (
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setHintsLeft((prev) => prev - 1);
-                      setActiveHints((prev) => ({
-                        ...prev,
-                        [hoveredCountry.id!]: scrambleName(hoveredCountry.properties.name)
-                      }));
-                    }}
-                    className="mt-1 px-3 py-2 bg-sky-500/20 hover:bg-sky-500/40 text-sky-100 rounded-lg text-[10px] transition-colors border border-sky-500/30 active:scale-95"
-                  >
-                    Use Hint ({hintsLeft} left)
-                  </button>
-                )
-              )}
-            </div>
-          </div>
-        )}
+      <MapTooltip
+        hoveredCountry={hoveredCountry}
+        gameState={gameState}
+        correctIds={correctIds}
+        mousePos={mousePos}
+        hideTooltipTimeout={hideTooltipTimeout}
+        setHoveredCountry={setHoveredCountry}
+        activeHints={activeHints}
+        hintsLeft={hintsLeft}
+        setHintsLeft={setHintsLeft}
+        setActiveHints={setActiveHints}
+        scrambleName={scrambleName}
+      />
 
       <style jsx>{`
         .stars-container {
